@@ -1,7 +1,7 @@
 import streamlit as st
 import pdfplumber
 from langchain_google_genai import GoogleGenerativeAI
-from langchain.prompts import PromptTemplate
+from langchain import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
 # Set page configuration
