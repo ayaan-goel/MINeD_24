@@ -1,5 +1,6 @@
-pdfplumber
-streamlit
-langchain-google-genai
-langchain
-langchain-prompts
+pdfplumber==0.10.4
+streamlit==1.31.0
+langchain==0.1.6
+langchain-community==0.0.19
+langchain-core==0.1.22
+langchain-google-genai==0.0.8
