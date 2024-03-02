@@ -82,7 +82,7 @@ if uploaded_file is not None:
             try:
                 result = parent_chain({'text': extracted_text})
 
-                st.write("Education Details:")
+                
                 st.write(result['descript_two'])
 
                 st.write(result['work_details'])
