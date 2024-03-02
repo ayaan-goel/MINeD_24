@@ -39,4 +39,3 @@ This project is licensed under the MIT License. See LICENSE for details.
 
 Feel the magic! ✨ Contribute or raise issues – let the enchantment continue!
 
-Simply copy the text from here and paste it into your README file, preserving the original font style.
