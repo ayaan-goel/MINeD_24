@@ -15,7 +15,7 @@ pip install streamlit pdfplumber langchain-google-genai
 Usage
 Clone the repository:
 ```bash
-git clone https://github.com/yourusername/resumagic.git
+git clone https://github.com/ayaan-goel/MINeD_24
 cd resumagic
 ```
 Run the enchanting Streamlit app:
