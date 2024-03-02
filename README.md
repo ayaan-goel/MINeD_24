@@ -10,7 +10,7 @@ Ensure you have the necessary dependencies by running:
 
 ```bash
 pip install streamlit pdfplumber langchain-google-genai
-
+exit
 
 Usage
 Clone the repository:
