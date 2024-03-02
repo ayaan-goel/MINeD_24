@@ -1,6 +1,7 @@
 import streamlit as st
 import pdfplumber
 import docx2txt  # Library for extracting text from DOCX files
+from bs4 import BeautifulSoup  # Library for parsing HTML
 from langchain_google_genai import GoogleGenerativeAI
 from langchain import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
@@ -60,10 +61,10 @@ career_trajectory_chain = LLMChain(llm=llm, prompt=career_trajectory_prompt, ver
 parent_chain = SequentialChain(chains=[chain1, chain2, work_chain, projects_chain, skills_chain, career_trajectory_chain], input_variables=['text'], output_variables=['descript_two', 'work_details', 'projects_details', 'skills_details', 'career_trajectory'], verbose=True)
 
 # Streamlit UI
-st.title('ResuMAGIC AI 🌟 ')
+st.title('ResuMAGIC AI 🌟')
 
-# File uploader for resume PDF
-uploaded_file = st.file_uploader("Upload Resume PDF", type=['pdf','docx'])
+# File uploader for resume PDF, DOCX, and HTML
+uploaded_file = st.file_uploader("Upload Resume PDF, DOCX, or HTML", type=['pdf', 'docx', 'html'])
 
 if uploaded_file is not None:
     # Display loading spinner while processing the file
@@ -79,6 +80,10 @@ if uploaded_file is not None:
         elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
             # Extract text from DOCX
             extracted_text = docx2txt.process(uploaded_file)
+        elif uploaded_file.type == 'text/html':
+            # Extract text from HTML
+            soup = BeautifulSoup(uploaded_file, 'html.parser')
+            extracted_text = soup.get_text()
 
         # Display extracted text
         st.subheader("Check Out the Outcomes :")
@@ -88,7 +93,7 @@ if uploaded_file is not None:
             try:
                 result = parent_chain({'text': extracted_text})
 
-               
+                st.write("Education Details:")
                 st.write(result['descript_two'])
 
                 st.write(result['work_details'])
@@ -102,4 +107,4 @@ if uploaded_file is not None:
             except Exception as e:
                 st.error(f"An error occurred during analysis: {e}")
 else:
-    st.info("Please upload a PDF or DOCX file to analyze.")
+    st.info("Please upload a PDF, DOCX, or HTML file to analyze.")
