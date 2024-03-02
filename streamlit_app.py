@@ -1,5 +1,6 @@
 import streamlit as st
 import pdfplumber
+import docx2txt  # Library for extracting text from DOCX files
 from langchain_google_genai import GoogleGenerativeAI
 from langchain import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
@@ -61,18 +62,23 @@ parent_chain = SequentialChain(chains=[chain1, chain2, work_chain, projects_chai
 # Streamlit UI
 st.title('ResuMAGIC AI 🌟')
 
-# File uploader for resume PDF
-uploaded_file = st.file_uploader("Upload Resume PDF", type=['pdf'])
+# File uploader for resume PDF and DOCX
+uploaded_file = st.file_uploader("Upload Resume PDF or DOCX", type=['pdf', 'docx'])
 
 if uploaded_file is not None:
     # Display loading spinner while processing the file
     with st.spinner("Analyzing..."):
-        # Extract text from uploaded PDF
-        with pdfplumber.open(uploaded_file) as pdf:
-            extracted_text = ""
-            for page in pdf.pages:
-                page_text = page.extract_text()
-                extracted_text += page_text + "\n"
+        # Extract text from uploaded file
+        if uploaded_file.type == 'application/pdf':
+            # Extract text from PDF
+            with pdfplumber.open(uploaded_file) as pdf:
+                extracted_text = ""
+                for page in pdf.pages:
+                    page_text = page.extract_text()
+                    extracted_text += page_text + "\n"
+        elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+            # Extract text from DOCX
+            extracted_text = docx2txt.process(uploaded_file)
 
         # Display extracted text
         st.subheader("Check Out the Outcomes :")
@@ -82,7 +88,7 @@ if uploaded_file is not None:
             try:
                 result = parent_chain({'text': extracted_text})
 
-                
+                st.write("Education Details:")
                 st.write(result['descript_two'])
 
                 st.write(result['work_details'])
@@ -96,4 +102,5 @@ if uploaded_file is not None:
             except Exception as e:
                 st.error(f"An error occurred during analysis: {e}")
 else:
-    st.info("Please upload a PDF file to analyze.")
+    st.info("Please upload a PDF or DOCX file to analyze.")
+
