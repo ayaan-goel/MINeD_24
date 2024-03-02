@@ -60,10 +60,10 @@ career_trajectory_chain = LLMChain(llm=llm, prompt=career_trajectory_prompt, ver
 parent_chain = SequentialChain(chains=[chain1, chain2, work_chain, projects_chain, skills_chain, career_trajectory_chain], input_variables=['text'], output_variables=['descript_two', 'work_details', 'projects_details', 'skills_details', 'career_trajectory'], verbose=True)
 
 # Streamlit UI
-st.title('ResuMAGIC AI 🌟')
+st.title('ResuMAGIC AI 🌟 ')
 
-# File uploader for resume PDF and DOCX
-uploaded_file = st.file_uploader("Upload Resume PDF or DOCX", type=['pdf', 'docx'])
+# File uploader for resume PDF
+uploaded_file = st.file_uploader("Upload Resume PDF", type=['pdf','docx'])
 
 if uploaded_file is not None:
     # Display loading spinner while processing the file
@@ -103,4 +103,3 @@ if uploaded_file is not None:
                 st.error(f"An error occurred during analysis: {e}")
 else:
     st.info("Please upload a PDF or DOCX file to analyze.")
-
