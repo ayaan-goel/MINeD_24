@@ -5,7 +5,7 @@ from langchain import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
 # Set page configuration
-st.set_page_config(page_title="RESUME ANALYSER", page_icon="🌟", layout="wide")
+st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
 
 # Initialize Gemini LLM with Google API key
 google_api_key = "AIzaSyDX7iqE8XTN8npHp9jKZST8HMfZS4ncNpg"  # Replace with your Google API key
