@@ -1,7 +1,7 @@
 import streamlit as st
 import pdfplumber
 from langchain_google_genai import GoogleGenerativeAI
-#from langchain import PromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
 # Set page configuration
@@ -11,39 +11,43 @@ st.set_page_config(page_title="RESUME ANALYSER", page_icon="🌟", layout="wide"
 google_api_key = "AIzaSyDX7iqE8XTN8npHp9jKZST8HMfZS4ncNpg"  # Replace with your Google API key
 llm = GoogleGenerativeAI(temperature=0.1, google_api_key=google_api_key, model="gemini-pro")
 
-# Define prompt templates using f-strings
-first_input_prompt_template = "Please provide a rewritten version of {text}."
-second_input_prompt_template = "Please extract and provide education details from {descript}."
-work_prompt_template = "Please extract and provide work experience details from {text}."
-projects_prompt_template = "Please extract and provide project details from {text}."
-skills_prompt_template = "Please extract and provide skills from {text}."
-career_trajectory_prompt_template = "Based on the provided education, work experience, and projects, analyze the career trajectory also mention year if given."
-
-# Initialize Prompt Templates
+# Prompt Templates
 first_input_prompt = PromptTemplate(
     input_variables=['text'],
-    template=first_input_prompt_template
+    template="Please provide a rewritten version of {text}."
+
 )
+
 second_input_prompt = PromptTemplate(
     input_variables=['descript'],
-    template=second_input_prompt_template
+    template="Please extract and provide education details from {descript}."
 )
+
+# Initialize Work Chain prompt template
 work_prompt = PromptTemplate(
     input_variables=['text'],
-    template=work_prompt_template
+    template="Please extract and provide work experience details from {text}."
 )
+
+# Initialize Projects Chain prompt template
 projects_prompt = PromptTemplate(
     input_variables=['text'],
-    template=projects_prompt_template
+    template="Please extract and provide project details from {text}."
 )
+
+# Initialize Skills Chain prompt template
 skills_prompt = PromptTemplate(
     input_variables=['text'],
-    template=skills_prompt_template
+    template="Please extract and provide skills from {text}."
 )
+
+# Initialize Career Trajectory Chain prompt template
 career_trajectory_prompt = PromptTemplate(
     input_variables=['education', 'work', 'projects'],
-    template=career_trajectory_prompt_template
+    template="Based on the provided education, work experience, and projects, analyze the career trajectory also mention year if given."
 )
+# Chain of LLMs
+# Chain of LLMs
 
 # Chain of LLMs
 chain1 = LLMChain(llm=llm, prompt=first_input_prompt, verbose=True, output_key='descript')
@@ -74,13 +78,14 @@ if uploaded_file is not None:
 
     # Display extracted text
     st.subheader("Check Out the Outcomes :")
+   
 
     # Execute the parent chain using the extracted text
     if extracted_text:
         try:
             result = parent_chain({'text': extracted_text})
            
-            st.write("Education Details:")
+          
             st.write(result['descript_two'])
             
             st.write(result['work_details'])
