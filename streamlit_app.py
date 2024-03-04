@@ -9,8 +9,6 @@ from langchain_google_genai import GoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
-pytesseract.pytesseract.tesseract_cmd = r'C:\\Program Files\\Tesseract-OCR\\tesseract.exe'
-
 # Set page configuration
 st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
 
