@@ -4,7 +4,7 @@ import pdfplumber
 import docx2txt  # Library for extracting text from DOCX files
 from bs4 import BeautifulSoup  # Library for parsing HTML
 from PIL import Image
-
+import easyocr 
 from langchain_google_genai import GoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
@@ -110,6 +110,11 @@ if uploaded_file is not None:
             # Extract text from HTML
             soup = BeautifulSoup(uploaded_file, 'html.parser')
             extracted_text = soup.get_text()
+        elif uploaded_file.type.startswith('image/'):
+            # Extract text from JPEG using EasyOCR
+            reader = easyocr.Reader(['en'])  # Specify language(s) as needed
+            result = reader.readtext(uploaded_file.read())
+            extracted_text = result    
             
 
         # Display extracted text
