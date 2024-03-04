@@ -142,7 +142,7 @@ if uploaded_file is not None:
                 st.write(result.get('skills_details', []))
                 
                 st.write("Career Tracjectory:")
-                st.write(result.get('career_trajectory', []))
+                st.write(result.get('career_trajectory_prompt', []))
 
             except Exception as e:
                 st.error(f"An error occurred during analysis: {e}")
