@@ -4,7 +4,7 @@ import pdfplumber
 import docx2txt  # Library for extracting text from DOCX files
 from bs4 import BeautifulSoup  # Library for parsing HTML
 from PIL import Image
-import pytesseract
+
 from langchain_google_genai import GoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
@@ -110,11 +110,7 @@ if uploaded_file is not None:
             # Extract text from HTML
             soup = BeautifulSoup(uploaded_file, 'html.parser')
             extracted_text = soup.get_text()
-        elif uploaded_file.type in ['image/jpeg', 'image/jpg']:
-            # Extract text from JPEG using OCR
-            try:
-                image = Image.open(uploaded_file)
-                extracted_text = pytesseract.image_to_string(image)
+        
             except Exception as e:
                 st.error(f"Error during OCR: {e}")
                 extracted_text = ""
