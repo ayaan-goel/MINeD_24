@@ -3,7 +3,7 @@ import pdfplumber
 import docx2txt  # Library for extracting text from DOCX files
 from bs4 import BeautifulSoup  # Library for parsing HTML
 from langchain_google_genai import GoogleGenerativeAI
-from langchain import PromptTemplate
+from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
 # Set page configuration
