@@ -110,9 +110,7 @@ if uploaded_file is not None:
             # Extract text from HTML
             soup = BeautifulSoup(uploaded_file, 'html.parser')
             extracted_text = soup.get_text()
-            except Exception as e:
-                st.error(f"Error during OCR: {e}")
-                extracted_text = ""
+            
 
         # Display extracted text
         st.subheader("Check Out the Outcomes :")
