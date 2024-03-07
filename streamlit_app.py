@@ -39,14 +39,14 @@ def your_similarity_function(job_desc1, job_desc2):
     # You can use techniques like cosine similarity, Jaccard similarity, etc.
     # For simplicity, let's assume a basic string matching approach for demonstration
     return sum(a == b for a, b in zip(job_desc1.lower(), job_desc2.lower())) / max(len(job_desc1), len(job_desc2))
-
 # Define prompt templates using f-strings
-first_input_prompt_template = "Please provide a rewritten version of {text}."
-second_input_prompt_template = "Please extract and provide education details from {descript}."
-work_prompt_template = "Please extract and provide work experience details from {text}."
-projects_prompt_template = "Please extract and provide project details from {text}."
-skills_prompt_template = "Please extract and provide skills from {text}."
-career_trajectory_prompt_template = "Based on the provided {work_details} experience, analyze the career trajectory and give output in the following format: 1. job_title (start_date) >> job_title_2 (start_date) >> job_title_3 (start_date) >> job_title_4 (start_date) >> job_title_5 (start_date) >> job_title_6 (start_date). Please include only the start dates for each job title to analyze the career trajectory."
+first_input_prompt_template = "Please provide a rewritten version of {text}. If no relevant information is available, please indicate that information is not given."
+second_input_prompt_template = "Please extract and provide education details from {descript}. If no relevant information is available, please indicate that information is not given."
+work_prompt_template = "Please extract and provide work experience details from {text}. If no relevant information is available, please indicate that information is not given."
+projects_prompt_template = "Please extract and provide project details from {text}. If no relevant information is available, please indicate that information is not given."
+skills_prompt_template = "Please extract and provide skills from {text}. If no relevant information is available, please indicate that information is not given."
+career_trajectory_prompt_template = "Based on the provided {work_details} experience, analyze the career trajectory and give output in the following format: 1. job_title (start_date) >> job_title_2 (start_date) >> job_title_3 (start_date) >> job_title_4 (start_date) >> job_title_5 (start_date) >> job_title_6 (start_date). Please include only the start dates for each job title to analyze the career trajectory. If no relevant information is available, please indicate that information is not given."
+
 # Initialize Prompt Templates
 first_input_prompt = PromptTemplate(
     input_variables=['text'],
