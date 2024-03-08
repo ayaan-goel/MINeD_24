@@ -87,7 +87,7 @@ career_trajectory_chain = LLMChain(llm=llm, prompt=career_trajectory_prompt, ver
 parent_chain = SequentialChain(chains=[chain1, chain2, work_chain, projects_chain, skills_chain, career_trajectory_chain], input_variables=['text'], output_variables=['descript_two', 'work_details', 'projects_details', 'skills_details', 'career_trajectory'], verbose=True)
 
 # Streamlit UI
-st.title('ResuMAGIC 🌟')
+st.title('ResuMAGIC')
 
 # File uploader for resume PDF, DOCX, HTML, and JPEG
 uploaded_file = st.file_uploader("Upload Resume PDF, DOCX, HTML, or JPEG", type=['pdf', 'docx', 'html', 'jpeg', 'jpg'])
