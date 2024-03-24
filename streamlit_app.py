@@ -1,15 +1,15 @@
 import pandas as pd
 import streamlit as st
-import pdfplumber
+import pdfplumber # Library for extracting text from PDF files
 import docx2txt  # Library for extracting text from DOCX files
 from bs4 import BeautifulSoup  # Library for parsing HTML
-from PIL import Image
-import easyocr 
+from PIL import Image 
+import easyocr # Library for extracting text from images
 from langchain_google_genai import GoogleGenerativeAI
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain, SequentialChain
 
-# Set page configuration
+# Page configuration
 st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
 
 # Load O*NET database (assuming it's in CSV format)
@@ -22,8 +22,6 @@ llm = GoogleGenerativeAI(temperature=0.1, google_api_key=google_api_key, model="
 
 # Define function to map job description to standardized job title
 def map_job_description_to_title(job_description):
-    # Your mapping logic here
-    # For example, find the closest match based on similarity of job descriptions
     similarity_scores = []
     for index, row in df_onet.iterrows():
         similarity_score = your_similarity_function(job_description, row['job_description'])
