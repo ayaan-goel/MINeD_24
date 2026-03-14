@@ -1,4 +1,5 @@
 import streamlit as st
+import os
 import pdfplumber
 import docx2txt
 from bs4 import BeautifulSoup
@@ -15,7 +16,16 @@ pytesseract.pytesseract.tesseract_cmd = r'C:\\Program Files\\Tesseract-OCR\\tess
 st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
 
 # Initialize Gemini LLM with Google API key
-google_api_key = "AIzaSyAkThsHjqoxUTjLT82GAIe1tqrwMe-GCys"  # Replace with your Google API key
+google_api_key = os.getenv("GOOGLE_API_KEY", "")
+if not google_api_key:
+    try:
+        google_api_key = st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        google_api_key = ""
+
+if not google_api_key:
+    st.error("Missing GOOGLE_API_KEY. Set environment variable GOOGLE_API_KEY (or Streamlit secrets).")
+    st.stop()
 llm = GoogleGenerativeAI(temperature=0.1, google_api_key=google_api_key, model="gemini-pro")
 
 # Define prompt templates using f-strings
