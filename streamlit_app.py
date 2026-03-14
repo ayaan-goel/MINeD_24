@@ -1,4 +1,5 @@
 import pandas as pd
+import os
 import streamlit as st
 import pdfplumber # Library for extracting text from PDF files
 import docx2txt  # Library for extracting text from DOCX files
@@ -17,7 +18,16 @@ onet_database = "test_two.csv"
 df_onet = pd.read_csv(onet_database)
 
 # Initialize Gemini LLM with Google API key
-google_api_key = "AIzaSyAkThsHjqoxUTjLT82GAIe1tqrwMe-GCys"  # Replace with your Google API key
+google_api_key = os.getenv("GOOGLE_API_KEY", "")
+if not google_api_key:
+    try:
+        google_api_key = st.secrets["GOOGLE_API_KEY"]
+    except Exception:
+        google_api_key = ""
+
+if not google_api_key:
+    st.error("Missing GOOGLE_API_KEY. Set environment variable GOOGLE_API_KEY (or Streamlit secrets).")
+    st.stop()
 llm = GoogleGenerativeAI(temperature=0.1, google_api_key=google_api_key, model="gemini-pro")
 
 # Define function to map job description to standardized job title
