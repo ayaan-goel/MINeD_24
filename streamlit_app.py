@@ -7,7 +7,7 @@ import streamlit as st
 
 import core
 
-st.set_page_config(page_title="ResuMAGIC", page_icon="ðŸŒŸ", layout="wide")
+st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
 
 
 def get_api_key() -> str:
@@ -37,17 +37,17 @@ def friendly_error(error: Exception) -> str:
 
 
 def text_or_dash(value) -> str:
-    return str(value) if value not in (None, "", []) else "â€”"
+    return str(value) if value not in (None, "", []) else "—"
 
 
 def date_range(start, end) -> str:
     parts = [str(p) for p in (start, end) if p]
-    return " â€“ ".join(parts)
+    return " – ".join(parts)
 
 
 def onet_caption(match: dict | None) -> None:
     if match:
-        st.caption(f"Standard title (O*NET {match['code']}): **{match['title']}**  Â·  match {match['score']:.2f}")
+        st.caption(f"Standard title (O*NET {match['code']}): **{match['title']}**  ·  match {match['score']:.2f}")
 
 
 def render_header(profile: dict) -> None:
@@ -55,9 +55,9 @@ def render_header(profile: dict) -> None:
     contact = [profile.get("email"), profile.get("phone"), profile.get("location")]
     contact = [str(c) for c in contact if c]
     if contact:
-        st.write(" Â· ".join(contact))
+        st.write(" · ".join(contact))
     if profile["links"]:
-        st.caption(" Â· ".join(str(link) for link in profile["links"]))
+        st.caption(" · ".join(str(link) for link in profile["links"]))
     if profile.get("summary"):
         st.info(profile["summary"])
 
@@ -76,11 +76,11 @@ def render_experience(profile: dict) -> None:
         st.write("No work experience found in this resume.")
     for job in profile["experience"]:
         with st.container(border=True):
-            st.subheader(f"{text_or_dash(job.get('title'))} Â· {text_or_dash(job.get('company'))}", divider=False)
+            st.subheader(f"{text_or_dash(job.get('title'))} · {text_or_dash(job.get('company'))}", divider=False)
             meta = [date_range(job.get("start"), job.get("end")), job.get("location")]
             meta = [str(m) for m in meta if m]
             if meta:
-                st.caption(" Â· ".join(meta))
+                st.caption(" · ".join(meta))
             for point in job["highlights"]:
                 st.markdown(f"- {point}")
             onet_caption(job.get("standard_title"))
@@ -109,7 +109,7 @@ def render_projects(profile: dict) -> None:
         with st.container(border=True):
             st.subheader(text_or_dash(project.get("name")), divider=False)
             if project["tech"]:
-                st.caption(" Â· ".join(project["tech"]))
+                st.caption(" · ".join(project["tech"]))
             if project.get("description"):
                 st.write(project["description"])
 
@@ -136,7 +136,7 @@ def render_career(career: dict) -> None:
             if step.get("start"):
                 label += f" ({step['start']})"
             steps.append(label)
-        st.markdown("  â†’  ".join(steps))
+        st.markdown("  →  ".join(steps))
     else:
         st.write("No dated roles found, so a career path could not be drawn.")
 
@@ -181,7 +181,7 @@ def render_result(result: dict, file_name: str) -> None:
     st.caption(f"Analysed with {result['model']}")
 
 
-st.title("ðŸŒŸ ResuMAGIC")
+st.title("🌟 ResuMAGIC")
 st.write("Upload a resume and get the education, experience, projects, skills and career path as clean, structured data.")
 
 with st.sidebar:
