@@ -1,42 +1,72 @@
 # ResuMAGIC 🌟
 
-Welcome to ResuMAGIC – your resume transformation wizard! This Streamlit web app, powered by LangChain and Google Generative AI, works like magic to analyze PDF resumes, unveiling education details, work experience, projects, skills, and career trajectory.
+Upload a resume and get it back as clean, structured data: contact details, education, work experience, projects, skills, and a career path, with each job title matched to a standard O*NET occupation.
 
-## Quick Start 🚀
+**Live app:** https://resumagic-codingrookies.streamlit.app/
 
-### Prerequisites
+## What it does
 
-Ensure you have the necessary dependencies by running:
+- **Reads 6 file types:** PDF, DOCX, HTML, TXT, and photos of a resume (JPG, PNG). Photos are read by Gemini itself, so no separate OCR engine is needed.
+- **Extracts structured data:** a chained Gemini pipeline (built with LangChain) first pulls out the profile as JSON, then analyses the career from that JSON (career path, total experience, strengths, roles the candidate fits).
+- **Standardises job titles:** every job title is matched against 1,016 O*NET occupations using TF-IDF similarity over titles and descriptions, so "Backend Engineer Intern" maps to "Software Developers".
+- **Clear output:** a profile header, summary numbers, one tab per section, and a button to download everything as JSON.
+- **Keeps working when models change:** the app asks the Gemini API which models exist and picks the newest stable Flash model, instead of hard-coding a name that Google may retire.
 
-```bash
-pip install streamlit pdfplumber langchain-google-genai
+## How it works
+
+```
+file ──► text ──► [Gemini] profile JSON ──► [Gemini] career analysis ──► O*NET title match ──► UI
+          ▲
+  photo ──┘ (transcribed by Gemini first)
 ```
 
-Usage
-Clone the repository:
+| File | Purpose |
+|---|---|
+| `streamlit_app.py` | The Streamlit UI |
+| `core.py` | File reading, the Gemini chain, and O*NET title matching (no UI code) |
+| `test_two.csv` | O*NET occupation titles and descriptions |
+
+## Run it locally
+
+Requires Python 3.10 or newer and a Gemini API key from [Google AI Studio](https://aistudio.google.com/apikey).
+
 ```bash
 git clone https://github.com/ayaan-goel/MINeD_24
-cd resumagic
+cd MINeD_24
+pip install -r requirements.txt
 ```
-Run the enchanting Streamlit app:
-```bash
-streamlit run app.py
-```
-Open your browser at http://localhost:8501 to experience the magic!
-Features ✨
-Upload & Reveal: Simply upload a PDF resume, and watch as ResuMAGIC reveals education, work, projects, skills, and career trajectory.
-Configuration 🔑
-Before running, replace the placeholder Google API key in the code with your own. Get your API key here.
-```bash
-google_api_key = "YOUR_GOOGLE_API_KEY"
-```
-Credits 🌈
-Streamlit
-pdfplumber
-LangChain
-Google Generative AI
-License 📜
-This project is licensed under the MIT License. See LICENSE for details.
 
-Feel the magic! ✨ Contribute or raise issues – let the enchantment continue!
+Create `.streamlit/secrets.toml` with your key (this file is git-ignored):
 
+```toml
+GOOGLE_API_KEY = "your-key-here"
+```
+
+Then start the app:
+
+```bash
+streamlit run streamlit_app.py
+```
+
+It opens at http://localhost:8501.
+
+## Configuration
+
+| Name | Required | Meaning |
+|---|---|---|
+| `GOOGLE_API_KEY` | Yes | Gemini API key. Read from the environment or from Streamlit secrets. |
+| `GEMINI_MODEL` | No | Force a specific model (for example `gemini-2.5-flash`). By default the newest stable Flash model is chosen automatically. |
+
+On Streamlit Community Cloud, set these under **App settings → Secrets**.
+
+## Privacy
+
+The uploaded resume is sent to Google Gemini for analysis. The app itself does not store it.
+
+## Built with
+
+Streamlit · LangChain · Google Gemini · pdfplumber · docx2txt · BeautifulSoup · pandas
+
+## License
+
+MIT
