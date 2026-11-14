@@ -1,154 +1,216 @@
-import pandas as pd
+"""ResuMAGIC - upload a resume, get it back as clean structured data."""
+
+import json
 import os
+
 import streamlit as st
-import pdfplumber # Library for extracting text from PDF files
-import docx2txt  # Library for extracting text from DOCX files
-from bs4 import BeautifulSoup  # Library for parsing HTML
-from PIL import Image 
-import easyocr # Library for extracting text from images
-from langchain_google_genai import GoogleGenerativeAI
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SequentialChain
 
-# Page configuration
-st.set_page_config(page_title="ResuMAGIC", page_icon="🌟", layout="wide")
+import core
 
-# Load O*NET database (assuming it's in CSV format)
-onet_database = "test_two.csv"
-df_onet = pd.read_csv(onet_database)
+st.set_page_config(page_title="ResuMAGIC", page_icon="ðŸŒŸ", layout="wide")
 
-# Initialize Gemini LLM with Google API key
-google_api_key = os.getenv("GOOGLE_API_KEY", "")
-if not google_api_key:
-    try:
-        google_api_key = st.secrets["GOOGLE_API_KEY"]
-    except Exception:
-        google_api_key = ""
 
-if not google_api_key:
-    st.error("Missing GOOGLE_API_KEY. Set environment variable GOOGLE_API_KEY (or Streamlit secrets).")
+def get_api_key() -> str:
+    key = os.getenv("GOOGLE_API_KEY", "")
+    if not key:
+        try:
+            key = st.secrets["GOOGLE_API_KEY"]
+        except Exception:
+            key = ""
+    return key.strip()
+
+
+@st.cache_data(show_spinner=False, ttl=3600, max_entries=20)
+def analyse_file(file_name: str, data: bytes) -> dict:
+    """Cached by file content, so re-clicking a tab never calls Gemini again."""
+    return core.analyse(get_api_key(), core.load_resume(file_name, data))
+
+
+def friendly_error(error: Exception) -> str:
+    message = str(error)
+    lowered = message.lower()
+    if "429" in message or "quota" in lowered or "resource_exhausted" in lowered:
+        return "The Gemini API quota for this app is used up for the moment. Please try again in a minute."
+    if "api key" in lowered or "api_key_invalid" in lowered or "permission" in lowered or "403" in message:
+        return "The Gemini API key was rejected. Check the GOOGLE_API_KEY secret."
+    return f"Something went wrong while analysing the resume: {message}"
+
+
+def text_or_dash(value) -> str:
+    return str(value) if value not in (None, "", []) else "â€”"
+
+
+def date_range(start, end) -> str:
+    parts = [str(p) for p in (start, end) if p]
+    return " â€“ ".join(parts)
+
+
+def onet_caption(match: dict | None) -> None:
+    if match:
+        st.caption(f"Standard title (O*NET {match['code']}): **{match['title']}**  Â·  match {match['score']:.2f}")
+
+
+def render_header(profile: dict) -> None:
+    st.header(text_or_dash(profile.get("name")))
+    contact = [profile.get("email"), profile.get("phone"), profile.get("location")]
+    contact = [str(c) for c in contact if c]
+    if contact:
+        st.write(" Â· ".join(contact))
+    if profile["links"]:
+        st.caption(" Â· ".join(str(link) for link in profile["links"]))
+    if profile.get("summary"):
+        st.info(profile["summary"])
+
+
+def render_metrics(profile: dict, career: dict) -> None:
+    skill_count = sum(len(items) for items in profile["skills"].values())
+    columns = st.columns(4)
+    columns[0].metric("Roles", len(profile["experience"]))
+    columns[1].metric("Projects", len(profile["projects"]))
+    columns[2].metric("Skills", skill_count)
+    columns[3].metric("Experience", text_or_dash(career.get("total_experience")))
+
+
+def render_experience(profile: dict) -> None:
+    if not profile["experience"]:
+        st.write("No work experience found in this resume.")
+    for job in profile["experience"]:
+        with st.container(border=True):
+            st.subheader(f"{text_or_dash(job.get('title'))} Â· {text_or_dash(job.get('company'))}", divider=False)
+            meta = [date_range(job.get("start"), job.get("end")), job.get("location")]
+            meta = [str(m) for m in meta if m]
+            if meta:
+                st.caption(" Â· ".join(meta))
+            for point in job["highlights"]:
+                st.markdown(f"- {point}")
+            onet_caption(job.get("standard_title"))
+
+
+def render_education(profile: dict) -> None:
+    if not profile["education"]:
+        st.write("No education details found in this resume.")
+        return
+    rows = [
+        {
+            "Degree": text_or_dash(item.get("degree")),
+            "Institution": text_or_dash(item.get("institution")),
+            "Period": text_or_dash(date_range(item.get("start"), item.get("end"))),
+            "Score": text_or_dash(item.get("score")),
+        }
+        for item in profile["education"]
+    ]
+    st.dataframe(rows, hide_index=True)
+
+
+def render_projects(profile: dict) -> None:
+    if not profile["projects"]:
+        st.write("No projects found in this resume.")
+    for project in profile["projects"]:
+        with st.container(border=True):
+            st.subheader(text_or_dash(project.get("name")), divider=False)
+            if project["tech"]:
+                st.caption(" Â· ".join(project["tech"]))
+            if project.get("description"):
+                st.write(project["description"])
+
+
+def render_skills(profile: dict) -> None:
+    if not profile["skills"]:
+        st.write("No skills found in this resume.")
+    for category, items in profile["skills"].items():
+        st.markdown(f"**{category}**")
+        st.markdown(" ".join(f"`{item}`" for item in items))
+    for title, key in (("Certifications", "certifications"), ("Achievements", "achievements")):
+        if profile[key]:
+            st.markdown(f"**{title}**")
+            for item in profile[key]:
+                st.markdown(f"- {item}")
+
+
+def render_career(career: dict) -> None:
+    if career["career_path"]:
+        st.markdown("**Career path** (earliest to latest)")
+        steps = []
+        for step in career["career_path"]:
+            label = f"**{text_or_dash(step.get('title'))}** at {text_or_dash(step.get('company'))}"
+            if step.get("start"):
+                label += f" ({step['start']})"
+            steps.append(label)
+        st.markdown("  â†’  ".join(steps))
+    else:
+        st.write("No dated roles found, so a career path could not be drawn.")
+
+    if career["strengths"]:
+        st.markdown("**Strengths**")
+        for item in career["strengths"]:
+            st.markdown(f"- {item}")
+
+    if career["suggested_roles"]:
+        st.markdown("**Roles this resume fits**")
+        for item in career["suggested_roles"]:
+            st.markdown(f"- {item['role']}")
+            onet_caption(item.get("standard_title"))
+
+
+def render_result(result: dict, file_name: str) -> None:
+    profile, career = result["profile"], result["career"]
+    render_header(profile)
+    render_metrics(profile, career)
+
+    tabs = st.tabs(["Experience", "Education", "Projects", "Skills", "Career path", "Raw text"])
+    with tabs[0]:
+        render_experience(profile)
+    with tabs[1]:
+        render_education(profile)
+    with tabs[2]:
+        render_projects(profile)
+    with tabs[3]:
+        render_skills(profile)
+    with tabs[4]:
+        render_career(career)
+    with tabs[5]:
+        st.text(result["resume_text"])
+
+    export = {"profile": profile, "career": career}
+    st.download_button(
+        "Download as JSON",
+        data=json.dumps(export, indent=2, ensure_ascii=False),
+        file_name=f"{file_name.rsplit('.', 1)[0]}_parsed.json",
+        mime="application/json",
+    )
+    st.caption(f"Analysed with {result['model']}")
+
+
+st.title("ðŸŒŸ ResuMAGIC")
+st.write("Upload a resume and get the education, experience, projects, skills and career path as clean, structured data.")
+
+with st.sidebar:
+    st.subheader("How it works")
+    st.markdown(
+        "1. The file is read into text (photos are read by Gemini).\n"
+        "2. A chained Gemini pipeline extracts the details, then analyses the career.\n"
+        "3. Job titles are matched to standard O*NET occupation titles."
+    )
+    st.subheader("Supported files")
+    st.write("PDF, DOCX, HTML, TXT, JPG, PNG")
+    st.subheader("Privacy")
+    st.write("The resume is sent to Google Gemini for analysis. This app does not store it.")
+
+if not get_api_key():
+    st.error("Missing GOOGLE_API_KEY. Set it as an environment variable or in Streamlit secrets.")
     st.stop()
-llm = GoogleGenerativeAI(temperature=0.1, google_api_key=google_api_key, model="gemini-pro")
 
-# Define function to map job description to standardized job title
-def map_job_description_to_title(job_description):
-    similarity_scores = []
-    for index, row in df_onet.iterrows():
-        similarity_score = your_similarity_function(job_description, row['job_description'])
-        similarity_scores.append((row['standerlised_tittle'], similarity_score))
-    
-    # Sort similarity scores and return the most similar job title
-    sorted_scores = sorted(similarity_scores, key=lambda x: x[1], reverse=True)
-    return sorted_scores[0][0] if sorted_scores[0][1] > 0 else None
+uploaded = st.file_uploader("Upload a resume", type=core.SUPPORTED_TYPES)
 
-# Function to calculate similarity between job descriptions
-def your_similarity_function(job_desc1, job_desc2):
-    # Your similarity calculation method here
-    # You can use techniques like cosine similarity, Jaccard similarity, etc.
-    # For simplicity, let's assume a basic string matching approach for demonstration
-    return sum(a == b for a, b in zip(job_desc1.lower(), job_desc2.lower())) / max(len(job_desc1), len(job_desc2))
-# Define prompt templates using f-strings
-first_input_prompt_template = "Please provide a rewritten version of {text}. If no relevant information is available, please indicate that information is not given."
-second_input_prompt_template = "Please extract and provide education details from {descript}. If no relevant information is available, please indicate that information is not given."
-work_prompt_template = "Please extract and provide work experience details from {text}. If no relevant information is available, please indicate that information is not given."
-projects_prompt_template = "Please extract and provide project details from {text}. If no relevant information is available, please indicate that information is not given."
-skills_prompt_template = "Please extract and provide skills from {text}. If no relevant information is available, please indicate that information is not given."
-career_trajectory_prompt_template = "Based on the provided {work_details} experience, analyze the career trajectory and give output in the following format: 1. job_title (start_date) >> job_title_2 (start_date) >> job_title_3 (start_date) >> job_title_4 (start_date) >> job_title_5 (start_date) >> job_title_6 (start_date). Please include only the start dates for each job title to analyze the career trajectory. If no relevant information is available, please indicate that information is not given."
-
-# Initialize Prompt Templates
-first_input_prompt = PromptTemplate(
-    input_variables=['text'],
-    template=first_input_prompt_template
-)
-second_input_prompt = PromptTemplate(
-    input_variables=['descript'],
-    template=second_input_prompt_template
-)
-work_prompt = PromptTemplate(
-    input_variables=['text'],
-    template=work_prompt_template
-)
-projects_prompt = PromptTemplate(
-    input_variables=['text'],
-    template=projects_prompt_template
-)
-skills_prompt = PromptTemplate(
-    input_variables=['text'],
-    template=skills_prompt_template
-)
-career_trajectory_prompt = PromptTemplate(
-    input_variables=['text'],
-    template=career_trajectory_prompt_template
-)
-
-# Chain of LLMs
-chain1 = LLMChain(llm=llm, prompt=first_input_prompt, verbose=True, output_key='descript')
-chain2 = LLMChain(llm=llm, prompt=second_input_prompt, verbose=True, output_key='descript_two')
-
-# Initialize Chains for Work, Projects, Skills, and Career Trajectory
-work_chain = LLMChain(llm=llm, prompt=work_prompt, verbose=True, output_key='work_details')
-projects_chain = LLMChain(llm=llm, prompt=projects_prompt, verbose=True, output_key='projects_details')
-skills_chain = LLMChain(llm=llm, prompt=skills_prompt, verbose=True, output_key='skills_details')
-career_trajectory_chain = LLMChain(llm=llm, prompt=career_trajectory_prompt, verbose=True, output_key='career_trajectory')
-
-# Parent Chain for all tasks
-parent_chain = SequentialChain(chains=[chain1, chain2, work_chain, projects_chain, skills_chain, career_trajectory_chain], input_variables=['text'], output_variables=['descript_two', 'work_details', 'projects_details', 'skills_details', 'career_trajectory'], verbose=True)
-
-# Streamlit UI
-st.title('ResuMAGIC')
-
-# File uploader for resume PDF, DOCX, HTML, and JPEG
-uploaded_file = st.file_uploader("Upload Resume PDF, DOCX, HTML, or JPEG", type=['pdf', 'docx', 'html', 'jpeg', 'jpg'])
-
-if uploaded_file is not None:
-    # Display loading spinner while processing the file
-    with st.spinner("Analyzing..."):
-        # Extract text from uploaded file
-        if uploaded_file.type == 'application/pdf':
-            # Extract text from PDF
-            with pdfplumber.open(uploaded_file) as pdf:
-                extracted_text = ""
-                for page in pdf.pages:
-                    page_text = page.extract_text()
-                    extracted_text += page_text + "\n"
-        elif uploaded_file.type == 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-            # Extract text from DOCX
-            extracted_text = docx2txt.process(uploaded_file)
-        elif uploaded_file.type == 'text/html':
-            # Extract text from HTML
-            soup = BeautifulSoup(uploaded_file, 'html.parser')
-            extracted_text = soup.get_text()
-        elif uploaded_file.type.startswith('image/'):
-            # Extract text from JPEG using EasyOCR
-            reader = easyocr.Reader(['en'])  # Specify language(s) as needed
-            result = reader.readtext(uploaded_file.read())
-            extracted_text = result    
-            
-
-        # Display extracted text
-        st.subheader("Check Out the Outcomes :")
-
-        # Execute the parent chain using the extracted text
-        if extracted_text:
-            try:
-                result = parent_chain({'text': extracted_text})
-
-                # Map the extracted text to standardized job titles
-                standardized_job_titles = []
-                for extracted_job_desc in result.get('descript_two', []):
-                    standardized_job_title = map_job_description_to_title(extracted_job_desc)
-                    if standardized_job_title:
-                        standardized_job_titles.append(standardized_job_title)
-
-               
-                st.write(result.get('descript_two',[]))
-                st.write(result.get('projects_details', []))
-                st.write(result.get('skills_details', []))
-                
-                st.write("Career Tracjectory:")
-                st.write(result.get('career_trajectory', []))
-
-            except Exception as e:
-                st.error(f"An error occurred during analysis: {e}")
+if uploaded is None:
+    st.info("Upload a PDF, DOCX, HTML, TXT, JPG or PNG file to begin.")
 else:
-    st.info("Please upload a PDF, DOCX, HTML, or JPEG file to analyze.")
+    try:
+        with st.spinner("Reading and analysing the resume..."):
+            analysis = analyse_file(uploaded.name, uploaded.getvalue())
+    except core.ResumeError as error:
+        st.warning(str(error))
+    except Exception as error:  # noqa: BLE001 - show a readable message instead of a stack trace
+        st.error(friendly_error(error))
+    else:
+        render_result(analysis, uploaded.name)
