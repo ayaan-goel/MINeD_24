@@ -104,13 +104,13 @@ def load_resume(file_name: str, data: bytes) -> ResumeFile:
 # --------------------------------------------------------------------------
 
 MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200"
-PREFERRED_MODEL = "gemini-2.5-flash"
-FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.0-flash"]
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-flash-lite-latest"]
 
 
 def rank_models(models: list[dict]) -> list[str]:
     """Pick usable text models from the API's model list, newest stable Flash first."""
     stable: list[tuple[float, str]] = []
+    lite: list[tuple[float, str]] = []
     has_latest_alias = False
     for model in models:
         if "generateContent" not in model.get("supportedGenerationMethods", []):
@@ -118,10 +118,11 @@ def rank_models(models: list[dict]) -> list[str]:
         name = model.get("name", "").removeprefix("models/")
         if name == "gemini-flash-latest":
             has_latest_alias = True
-        match = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash", name)
+        match = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?", name)
         if match:
-            stable.append((float(match.group(1)), name))
-    ranked = [name for _, name in sorted(stable, reverse=True)]
+            (lite if match.group(2) else stable).append((float(match.group(1)), name))
+    # Lite models are lighter and less often overloaded, so they are the fallbacks.
+    ranked = [name for _, name in sorted(stable, reverse=True)] + [name for _, name in sorted(lite, reverse=True)]
     if has_latest_alias:
         ranked.append("gemini-flash-latest")
     return ranked
@@ -141,9 +142,7 @@ def candidate_models(api_key: str) -> list[str]:
             discovered = rank_models(json.load(response).get("models", []))
     except Exception:
         pass  # offline or listing blocked: fall through to the defaults below
-    # The proven model goes first because the very newest releases are often
-    # overloaded or slow; discovered models are the fallbacks when it is retired.
-    ordered = ([override] if override else []) + [PREFERRED_MODEL] + discovered + FALLBACK_MODELS
+    ordered = ([override] if override else []) + discovered + FALLBACK_MODELS
     return list(dict.fromkeys(ordered))
 
 
@@ -320,14 +319,14 @@ def _model_unavailable(error: Exception) -> bool:
     return any(marker in message for marker in markers)
 
 
-MAX_MODELS_TRIED = 4
+MAX_MODELS_TRIED = 5
 
 
 # Per Gemini call. The langchain client's own default (6 retries with growing
 # backoff) can turn one rate-limited request into several minutes of silence,
 # so it is cut down here; `analyse` still tries the next model on a 404.
-REQUEST_TIMEOUT_SECONDS = 45
-MAX_RETRIES = 2
+REQUEST_TIMEOUT_SECONDS = 40
+MAX_RETRIES = 1
 
 
 def analyse(api_key: str, resume: ResumeFile, make_llm=None, on_stage=_noop) -> dict:
