@@ -121,8 +121,10 @@ def rank_models(models: list[dict]) -> list[str]:
         match = re.fullmatch(r"gemini-(\d+(?:\.\d+)?)-flash(-lite)?", name)
         if match:
             (lite if match.group(2) else stable).append((float(match.group(1)), name))
-    # Lite models are lighter and less often overloaded, so they are the fallbacks.
-    ranked = [name for _, name in sorted(stable, reverse=True)] + [name for _, name in sorted(lite, reverse=True)]
+    # When the newest two are busy, try the lighter lite models before older full ones.
+    newest = [name for _, name in sorted(stable, reverse=True)]
+    lighter = [name for _, name in sorted(lite, reverse=True)]
+    ranked = newest[:2] + lighter + newest[2:]
     if has_latest_alias:
         ranked.append("gemini-flash-latest")
     return ranked
