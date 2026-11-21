@@ -104,7 +104,8 @@ def load_resume(file_name: str, data: bytes) -> ResumeFile:
 # --------------------------------------------------------------------------
 
 MODELS_URL = "https://generativelanguage.googleapis.com/v1beta/models?pageSize=200"
-FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.5-flash", "gemini-2.0-flash"]
+PREFERRED_MODEL = "gemini-2.5-flash"
+FALLBACK_MODELS = ["gemini-flash-latest", "gemini-2.0-flash"]
 
 
 def rank_models(models: list[dict]) -> list[str]:
@@ -132,18 +133,18 @@ def candidate_models(api_key: str) -> list[str]:
     Google retires model names over time (the original `gemini-pro` is gone), so
     instead of hard-coding one we ask the API what exists. `GEMINI_MODEL` overrides.
     """
-    names: list[str] = []
     override = os.getenv("GEMINI_MODEL", "").strip()
-    if override:
-        names.append(override)
+    discovered: list[str] = []
     try:
         request = urllib.request.Request(MODELS_URL, headers={"x-goog-api-key": api_key})
         with urllib.request.urlopen(request, timeout=10) as response:
-            names += rank_models(json.load(response).get("models", []))
+            discovered = rank_models(json.load(response).get("models", []))
     except Exception:
         pass  # offline or listing blocked: fall through to the defaults below
-    names += FALLBACK_MODELS
-    return list(dict.fromkeys(names))
+    # The proven model goes first because the very newest releases are often
+    # overloaded or slow; discovered models are the fallbacks when it is retired.
+    ordered = ([override] if override else []) + [PREFERRED_MODEL] + discovered + FALLBACK_MODELS
+    return list(dict.fromkeys(ordered))
 
 
 PROFILE_SCHEMA = """{
@@ -315,7 +316,7 @@ def _model_unavailable(error: Exception) -> bool:
     stop the request while an older one is idle."""
     message = str(error).lower()
     markers = ("404", "not found", "not supported", "503", "unavailable", "overloaded",
-               "high demand", "429", "resource_exhausted", "quota")
+               "high demand", "429", "resource_exhausted", "quota", "504", "deadline", "timed out", "timeout")
     return any(marker in message for marker in markers)
 
 
