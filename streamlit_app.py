@@ -1,5 +1,6 @@
 """ResuMAGIC - upload a resume, get it back as clean structured data."""
 
+import hashlib
 import json
 import os
 
@@ -20,12 +21,23 @@ def get_api_key() -> str:
     return key.strip()
 
 
-@st.cache_data(show_spinner=False, ttl=3600, max_entries=20)
-def analyse_file(file_name: str, data: bytes, _on_stage=None) -> dict:
-    """Cached by file name + content; the leading underscore keeps `_on_stage`
-    out of the cache key, so a cache hit skips Gemini entirely but a cache miss
-    still reports live progress."""
-    return core.analyse(get_api_key(), core.load_resume(file_name, data), on_stage=_on_stage or (lambda _m: None))
+@st.cache_resource
+def _result_cache() -> dict:
+    return {}
+
+
+def analyse_file(file_name: str, data: bytes, on_stage=None) -> dict:
+    """Analyse a file, remembering the last 20 results by content so re-running
+    the page does not call Gemini again. A manual cache is used because
+    st.cache_data forbids the progress callback (an st call) inside it."""
+    cache = _result_cache()
+    key = (file_name, hashlib.sha256(data).hexdigest())
+    if key not in cache:
+        result = core.analyse(get_api_key(), core.load_resume(file_name, data), on_stage=on_stage or (lambda _m: None))
+        if len(cache) >= 20:
+            cache.pop(next(iter(cache)))
+        cache[key] = result
+    return cache[key]
 
 
 def friendly_error(error: Exception) -> str:
@@ -215,7 +227,7 @@ else:
         status.write(message)
 
     try:
-        analysis = analyse_file(uploaded.name, uploaded.getvalue(), _on_stage=report)
+        analysis = analyse_file(uploaded.name, uploaded.getvalue(), on_stage=report)
     except core.ResumeError as error:
         status.update(label="Could not read this file", state="error")
         st.warning(str(error))
