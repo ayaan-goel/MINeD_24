@@ -21,9 +21,11 @@ def get_api_key() -> str:
 
 
 @st.cache_data(show_spinner=False, ttl=3600, max_entries=20)
-def analyse_file(file_name: str, data: bytes) -> dict:
-    """Cached by file content, so re-clicking a tab never calls Gemini again."""
-    return core.analyse(get_api_key(), core.load_resume(file_name, data))
+def analyse_file(file_name: str, data: bytes, _on_stage=None) -> dict:
+    """Cached by file name + content; the leading underscore keeps `_on_stage`
+    out of the cache key, so a cache hit skips Gemini entirely but a cache miss
+    still reports live progress."""
+    return core.analyse(get_api_key(), core.load_resume(file_name, data), on_stage=_on_stage or (lambda _m: None))
 
 
 def friendly_error(error: Exception) -> str:
@@ -205,12 +207,19 @@ uploaded = st.file_uploader("Upload a resume", type=core.SUPPORTED_TYPES)
 if uploaded is None:
     st.info("Upload a PDF, DOCX, HTML, TXT, JPG or PNG file to begin.")
 else:
+    status = st.status("Reading and analysing the resume...", expanded=True)
+
+    def report(message: str) -> None:
+        status.write(message)
+
     try:
-        with st.spinner("Reading and analysing the resume..."):
-            analysis = analyse_file(uploaded.name, uploaded.getvalue())
+        analysis = analyse_file(uploaded.name, uploaded.getvalue(), _on_stage=report)
     except core.ResumeError as error:
+        status.update(label="Could not read this file", state="error")
         st.warning(str(error))
     except Exception as error:  # noqa: BLE001 - show a readable message instead of a stack trace
+        status.update(label="Analysis failed", state="error")
         st.error(friendly_error(error))
     else:
+        status.update(label="Done", state="complete", expanded=False)
         render_result(analysis, uploaded.name)
