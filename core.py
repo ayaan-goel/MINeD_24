@@ -357,6 +357,7 @@ def analyse(api_key: str, resume: ResumeFile, make_llm=None, on_stage=_noop) -> 
             if not _model_unavailable(error):
                 raise
             last_error = error
+            on_stage(f"{model} failed: {str(error)[:160]}")
     raise RuntimeError(f"None of the Gemini models could answer right now. Last error: {last_error}")
 
 
