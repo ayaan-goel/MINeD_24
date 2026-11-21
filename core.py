@@ -195,31 +195,28 @@ CAREER_SYSTEM = (
 )
 
 
-def build_chain(llm):
-    """Chain: resume text -> structured profile -> career analysis."""
+def _extract_chain(llm):
+    """resume text -> structured profile JSON"""
     from langchain_core.output_parsers import JsonOutputParser
     from langchain_core.prompts import ChatPromptTemplate
-    from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
-    extract = (
+    return (
         ChatPromptTemplate.from_messages([("system", EXTRACT_SYSTEM), ("human", "Resume:\n\n{resume}")])
         | llm
         | JsonOutputParser()
     )
-    career = (
-        RunnableLambda(
-            lambda state: {
-                "schema": CAREER_SCHEMA,
-                "data": json.dumps(
-                    {key: state["profile"].get(key) for key in ("experience", "projects", "skills", "education")}
-                ),
-            }
-        )
-        | ChatPromptTemplate.from_messages([("system", CAREER_SYSTEM), ("human", "Resume data:\n\n{data}")])
+
+
+def _career_chain(llm):
+    """profile JSON (as a {data} string) -> career analysis JSON"""
+    from langchain_core.output_parsers import JsonOutputParser
+    from langchain_core.prompts import ChatPromptTemplate
+
+    return (
+        ChatPromptTemplate.from_messages([("system", CAREER_SYSTEM), ("human", "Resume data:\n\n{data}")])
         | llm
         | JsonOutputParser()
     )
-    return RunnablePassthrough.assign(profile=extract) | RunnablePassthrough.assign(career=career)
 
 
 def transcribe_image(llm, resume: ResumeFile) -> str:
@@ -236,6 +233,10 @@ def transcribe_image(llm, resume: ResumeFile) -> str:
     if len(text) < 50:
         raise ResumeError("Could not read any resume text from this image.")
     return text[:MAX_RESUME_CHARS]
+
+
+def _noop(_message: str) -> None:
+    pass
 
 
 def _as_list(value) -> list:
@@ -270,11 +271,31 @@ def _normalise(profile: dict, career: dict) -> dict:
     return {"profile": profile, "career": career}
 
 
-def run_pipeline(llm, resume: ResumeFile) -> dict:
-    """Run the full chain with one model and add O*NET matches."""
-    text = transcribe_image(llm, resume) if resume.is_image else resume.text
-    state = build_chain(llm).invoke({"resume": text, "schema": PROFILE_SCHEMA})
-    result = _normalise(state.get("profile"), state.get("career"))
+def run_pipeline(llm, resume: ResumeFile, on_stage=_noop) -> dict:
+    """Run the full chain with one model and add O*NET matches.
+
+    `on_stage(message)` is called before each slow step, so the caller (the
+    Streamlit UI) can show the user where things are instead of one silent spinner.
+    """
+    if resume.is_image:
+        on_stage("Reading the resume image...")
+        text = transcribe_image(llm, resume)
+    else:
+        text = resume.text
+
+    on_stage("Extracting profile details...")
+    profile = _extract_chain(llm).invoke({"resume": text, "schema": PROFILE_SCHEMA})
+
+    on_stage("Analysing career path...")
+    career_input = json.dumps(
+        {
+            key: profile.get(key) if isinstance(profile, dict) else None
+            for key in ("experience", "projects", "skills", "education")
+        }
+    )
+    career = _career_chain(llm).invoke({"data": career_input, "schema": CAREER_SCHEMA})
+
+    result = _normalise(profile, career)
 
     matcher = get_matcher()
     for job in result["profile"]["experience"]:
@@ -292,18 +313,32 @@ def _model_unavailable(error: Exception) -> bool:
     return "404" in message or "not found" in message or "not supported" in message
 
 
-def analyse(api_key: str, resume: ResumeFile, make_llm=None) -> dict:
+# Per Gemini call. The langchain client's own default (6 retries with growing
+# backoff) can turn one rate-limited request into several minutes of silence,
+# so it is cut down here; `analyse` still tries the next model on a 404.
+REQUEST_TIMEOUT_SECONDS = 45
+MAX_RETRIES = 2
+
+
+def analyse(api_key: str, resume: ResumeFile, make_llm=None, on_stage=_noop) -> dict:
     """Analyse a resume, moving to the next model if one has been retired."""
     if make_llm is None:
         from langchain_google_genai import ChatGoogleGenerativeAI
 
         def make_llm(model: str):
-            return ChatGoogleGenerativeAI(model=model, google_api_key=api_key, temperature=0.1)
+            return ChatGoogleGenerativeAI(
+                model=model,
+                google_api_key=api_key,
+                temperature=0.1,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+                max_retries=MAX_RETRIES,
+            )
 
     last_error: Exception | None = None
     for model in candidate_models(api_key):
+        on_stage(f"Trying {model}...")
         try:
-            result = run_pipeline(make_llm(model), resume)
+            result = run_pipeline(make_llm(model), resume, on_stage=on_stage)
             result["model"] = model
             return result
         except ResumeError:
