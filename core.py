@@ -309,8 +309,17 @@ def run_pipeline(llm, resume: ResumeFile, on_stage=_noop) -> dict:
 
 
 def _model_unavailable(error: Exception) -> bool:
+    """True when another model may succeed: retired (404), overloaded (503) or out of quota (429).
+
+    Quota and capacity are tracked per model, so a busy newest model should not
+    stop the request while an older one is idle."""
     message = str(error).lower()
-    return "404" in message or "not found" in message or "not supported" in message
+    markers = ("404", "not found", "not supported", "503", "unavailable", "overloaded",
+               "high demand", "429", "resource_exhausted", "quota")
+    return any(marker in message for marker in markers)
+
+
+MAX_MODELS_TRIED = 4
 
 
 # Per Gemini call. The langchain client's own default (6 retries with growing
@@ -335,7 +344,7 @@ def analyse(api_key: str, resume: ResumeFile, make_llm=None, on_stage=_noop) -> 
             )
 
     last_error: Exception | None = None
-    for model in candidate_models(api_key):
+    for model in candidate_models(api_key)[:MAX_MODELS_TRIED]:
         on_stage(f"Trying {model}...")
         try:
             result = run_pipeline(make_llm(model), resume, on_stage=on_stage)
@@ -347,7 +356,7 @@ def analyse(api_key: str, resume: ResumeFile, make_llm=None, on_stage=_noop) -> 
             if not _model_unavailable(error):
                 raise
             last_error = error
-    raise RuntimeError(f"No usable Gemini model was found for this API key. Last error: {last_error}")
+    raise RuntimeError(f"None of the Gemini models could answer right now. Last error: {last_error}")
 
 
 # --------------------------------------------------------------------------
