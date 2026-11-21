@@ -31,6 +31,8 @@ def analyse_file(file_name: str, data: bytes, _on_stage=None) -> dict:
 def friendly_error(error: Exception) -> str:
     message = str(error)
     lowered = message.lower()
+    if "503" in message or "unavailable" in lowered or "high demand" in lowered:
+        return "Google's Gemini models are overloaded right now. Please try again in a minute or two."
     if "429" in message or "quota" in lowered or "resource_exhausted" in lowered:
         return "The Gemini API quota for this app is used up for the moment. Please try again in a minute."
     if "api key" in lowered or "api_key_invalid" in lowered or "permission" in lowered or "403" in message:
